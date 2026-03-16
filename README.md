@@ -25,3 +25,7 @@ python3 scripts/export_codex_session.py \
   --recent 30 \
   --output-dir talk
 ```
+
+## 示例
+talk/20260310-019cd710-fca1d5f3.md
+记录了我在设计upper Bound tage 时候的沟通记录。
