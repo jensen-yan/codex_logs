@@ -35,3 +35,10 @@ python3 scripts/export_codex_session.py \
   --roles user \
   --output-dir prompts
 ```
+
+## 示例
+[talk/20260310-019cd710-fca1d5f3.md](talk/20260310-019cd710-fca1d5f3.md)
+
+[prompts/20260310-019cd710-fca1d5f3.md](prompts/20260310-019cd710-fca1d5f3.md)
+
+ 记录了我在设计upper Bound tage 时候的沟通记录。 User 部分是我的提示词； Assistant 部分是Codex 的回复。
