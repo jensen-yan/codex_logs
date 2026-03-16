@@ -51,6 +51,12 @@ def parse_args() -> argparse.Namespace:
         default=Path.home() / ".codex" / "sessions",
         help="Codex sessions root used together with --recent.",
     )
+    parser.add_argument(
+        "--roles",
+        choices=("all", "user"),
+        default="all",
+        help="Export all shareable entries or only user prompts.",
+    )
     return parser.parse_args()
 
 
@@ -241,6 +247,14 @@ def collect_entries(rows: list[dict[str, Any]]) -> tuple[list[Entry], dict[str, 
     return entries, meta
 
 
+def filter_entries(entries: list[Entry], roles: str) -> list[Entry]:
+    if roles == "all":
+        return entries
+    if roles == "user":
+        return [entry for entry in entries if entry.role == "user"]
+    raise ValueError(f"Unsupported roles filter: {roles}")
+
+
 def session_id_from_meta(meta: dict[str, Any], session_path: Path) -> str:
     session_id = str(meta.get("id", "")).strip()
     if session_id:
@@ -280,14 +294,19 @@ def default_output_name(session_path: Path, meta: dict[str, Any]) -> str:
 
 
 def write_markdown(
-    entries: list[Entry], meta: dict[str, Any], session_path: Path, output_path: Path
+    entries: list[Entry],
+    meta: dict[str, Any],
+    session_path: Path,
+    output_path: Path,
+    roles: str,
 ) -> None:
     session_id = session_id_from_meta(meta, session_path)
     started_at = iso_to_local(str(meta.get("timestamp", "")))
     exported_at = datetime.now(tz=LOCAL_TZ) if LOCAL_TZ is not None else datetime.now()
 
     lines: list[str] = []
-    lines.append(f"# Conversation {session_id[:8]}")
+    title = "Prompts" if roles == "user" else "Conversation"
+    lines.append(f"# {title} {session_id[:8]}")
     lines.append("")
     if started_at is not None:
         lines.append(f"- Date: {started_at:%Y-%m-%d}")
@@ -295,6 +314,7 @@ def write_markdown(
     lines.append(f"- Session: `{session_id}`")
     lines.append(f"- Source: `{session_path}`")
     lines.append(f"- Messages: {len(entries)}")
+    lines.append(f"- Roles: `{roles}`")
     lines.append(f"- Exported: {exported_at:%Y-%m-%d %H:%M %Z}")
     lines.append("")
     lines.append("---")
@@ -315,11 +335,14 @@ def write_markdown(
     output_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
 
-def export_one(session_path: Path, output_path: Path | None, output_dir: Path | None) -> Path:
+def export_one(
+    session_path: Path, output_path: Path | None, output_dir: Path | None, roles: str
+) -> Path:
     rows = load_jsonl(session_path)
     entries, meta = collect_entries(rows)
+    entries = filter_entries(entries, roles)
     if not entries:
-        raise SystemExit(f"No shareable user/assistant entries found in {session_path}.")
+        raise SystemExit(f"No shareable entries found in {session_path} for roles={roles}.")
 
     if output_path is not None:
         target = output_path
@@ -328,7 +351,7 @@ def export_one(session_path: Path, output_path: Path | None, output_dir: Path | 
     else:
         target = output_path_for(session_path, meta, None)
 
-    write_markdown(entries, meta, session_path, target)
+    write_markdown(entries, meta, session_path, target, roles)
     return target
 
 
@@ -367,13 +390,13 @@ def main() -> None:
             raise SystemExit("--output cannot be used together with --recent.")
         target_dir = args.output_dir or Path.cwd()
         for session_path in recent_session_files(args.sessions_root, args.recent):
-            print(export_one(session_path, None, target_dir))
+            print(export_one(session_path, None, target_dir, args.roles))
         return
 
     if args.session_jsonl is None:
         raise SystemExit("session_jsonl is required unless --recent is used.")
 
-    print(export_one(args.session_jsonl, args.output, args.output_dir))
+    print(export_one(args.session_jsonl, args.output, args.output_dir, args.roles))
 
 
 if __name__ == "__main__":
